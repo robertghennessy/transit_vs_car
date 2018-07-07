@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jun 30 20:14:22 2018
+Program to query google maps
 
-@author: Robert
+@author: Robert (rghennessy@gmail.com)
 """
 
 import googlemaps
