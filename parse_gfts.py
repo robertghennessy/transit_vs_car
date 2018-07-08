@@ -144,6 +144,10 @@ schedule_trips['arrival_time_rank'] = schedule_trips.groupby(['short_stop_name_s
 # remove the trains where the deparature rank is less than arrival rank
 # because this means that a later train will arrive before this one
 schedule_trips = schedule_trips[schedule_trips['deparature_time_rank'] >= schedule_trips['arrival_time_rank']]
+# order the trains based on deperature time
+schedule_trips = schedule_trips.sort_values(['departure_time_timedelta_start', 'arrival_time_timedelta_stop'])
+schedule_trips = schedule_trips.reset_index(drop=True)
+#schedule_trips = schedule_trips.rename('trip_order')
 # output to csv
 schedule_trips.to_csv(config.trips_csv_path_out)
 

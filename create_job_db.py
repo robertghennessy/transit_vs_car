@@ -16,7 +16,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 weekday_names_sched_trips = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
 day_of_week_codes = ['mon','tue','wed','thu','fri','sat','sun']
 
-schedule_trips = pd.read_csv(config.trips_csv_path_in)
+schedule_trips = pd.read_csv(config.trips_csv_path_in, index_col=0)
 schedule_trips = schedule_trips.sort_values(['departure_time_timedelta_start', 'arrival_time_timedelta_stop'])
 schedule_trips_index = schedule_trips.index
 
