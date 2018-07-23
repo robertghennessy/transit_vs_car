@@ -148,6 +148,8 @@ schedule_trips = schedule_trips[schedule_trips['deparature_time_rank'] >= schedu
 schedule_trips = schedule_trips.sort_values(['departure_time_timedelta_start', 'arrival_time_timedelta_stop'])
 schedule_trips = schedule_trips.reset_index(drop=True)
 schedule_trips['trip_index'] = schedule_trips.index
+schedule_trips['sched_trip_duration_secs'] = (schedule_trips['arrival_time_timedelta_stop']
+                                 - schedule_trips['departure_time_timedelta_start']).dt.total_seconds()
 #schedule_trips = schedule_trips.rename('trip_order')
 # output to csv
 schedule_trips.to_csv(config.trips_csv_path_out)

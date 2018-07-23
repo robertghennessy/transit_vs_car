@@ -59,3 +59,4 @@ def insert_trip_data(conn, data):
     cur.execute(sql, data)
     lastrowid = cur.lastrowid
     return lastrowid
+    

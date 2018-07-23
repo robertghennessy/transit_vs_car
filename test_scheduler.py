@@ -14,6 +14,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import sql_functions as sf
+import logging
 
 week_names_sched_trips = ['monday', 'tuesday', 'wednesday', 'thursday', 
                           'friday', 'saturday', 'sunday']
@@ -57,7 +58,7 @@ def dummy_function(trip_index, trip_id, start_station, end_station, start_loc, e
     # print out the task that just completed
     print_str = (str(trip_index) + ': ' + start_station + ' to ' + end_station 
                 + ' on ' + date_str + ' at ' + time_str)
-    print(print_str)
+    logging.info(print_str)
     return None
 
 #  Create a tst csv to be used with the scheduler
@@ -175,6 +176,15 @@ if os.path.isfile(test_output_database):
     os.remove(test_output_database)
 else:    ## Show an error ##
     print("Error: %s file not found" % test_output_database)
+
+# rename the old logger
+if os.path.isfile(config.log_file):
+    new_logfile_name = 'SchedulerLog-{date:%Y-%m-%d_%H-%M-%S}.txt'.format(date=datetime.now())    
+    os.rename(config.log_file, os.path.join(config.logs_dir,new_logfile_name))
+# create a new logger 
+logging.basicConfig(filename=config.log_file, level=logging.INFO, 
+                    format = '%(asctime)s - %(levelname)s - %(message)s')
+
 create_tst_csv(csv_file_loc,test_csv_file_loc)
 create_job_database(test_csv_file_loc, config.scheduler_sql_test_loc)
 sf.create_trip_data_table(test_output_database)
