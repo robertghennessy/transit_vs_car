@@ -10,7 +10,6 @@ import sys
 import os
 import config
 import pandas as pd
-from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import sql_functions as sf
