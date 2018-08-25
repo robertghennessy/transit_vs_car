@@ -143,6 +143,7 @@ def main():
         print("Error: %s file not found" % test_output_database)
     
     # rename the old logger
+    new_logfile_name = ''
     if os.path.isfile(test_log_file):
         new_logfile_name = 'SchedulerLog-{date:%Y-%m-%d_%H-%M-%S}.txt'.format(
             date=dt.datetime.now())    

@@ -9,6 +9,7 @@ import datetime as dt
 import os
 import config
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import sql_functions as sf
 import logging
@@ -94,13 +95,14 @@ def run_tasks(sql_loc):
     jobstores = {
         'default': SQLAlchemyJobStore(url='sqlite:///%s' % sql_loc)
     }
-    scheduler = BackgroundScheduler(jobstores=jobstores)
+    scheduler = BlockingScheduler(jobstores=jobstores)
     scheduler.start()    
     scheduler.print_jobs()
     return None
 
 def main():   
     # rename the old logger
+    new_logfile_name = ''
     if os.path.isfile(config.log_file):
         new_logfile_name = 'SchedulerLog-{date:%Y-%m-%d_%H-%M-%S}.txt'.format(
             date=dt.datetime.now())    

@@ -85,11 +85,11 @@ def nightly_check(sql_db_loc,expected_num):
 
     : return: None
     '''
-    utc_time_prev = (dt.datetime.now() + dt.timedelta(days=-1)) 
+    utc_time_prev = (dt.datetime.utcnow() + dt.timedelta(days=-1)) 
     utc_time_prev = utc_time_prev.timestamp()
     # determine if a push notification occurred during the desired time period
     # defined by delay_between_push
-    rowsQuery = ('select count(*) from process_monitor where utc_time > %f ' 
+    rowsQuery = ('select count(*) from trip_data where utc_time > %f ' 
                     % utc_time_prev)   
     num_rows = sf.query_data(sql_db_loc,rowsQuery)[0][0]
     
