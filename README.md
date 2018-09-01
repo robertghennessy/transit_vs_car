@@ -2,3 +2,6 @@
 Dependincies
 apscheduler
 googlemaps
+partridge
+python-pushover
+Tenacity

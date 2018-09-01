@@ -1,31 +1,42 @@
-# -*- coding: utf-8 -*-
 """
-@author: Robert Hennessy (rghennessy@gmail.com)
-
 Description: This program was written to collect traffic data from google maps.
     The time and routes are stored in sqlite database.
+    
+@author: Robert Hennessy (robertghennessy@gmail.com)
 """
 import datetime as dt
-import os
 import config
-from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import sql_functions as sf
 import logging
 import googlemaps
 import error_handling as eh
+import tenacity as ten
 
 week_names_sched_trips = ['monday', 'tuesday', 'wednesday', 'thursday', 
                           'friday', 'saturday', 'sunday']
 day_of_week_codes = ['mon','tue','wed','thu','fri','sat','sun']
 
+# set up the root logger
+logger = logging.getLogger('')
+logger.setLevel(logging.INFO)
+dateTag = dt.datetime.now().strftime("%Y-%b-%d_%H-%M-%S")
+log_filename = config.log_file % dateTag
+# add a rotating handler, rotate the file every 10 mb. Keep the last 5 logfiles
+handler = logging.handlers.RotatingFileHandler(log_filename, 
+                                    maxBytes=10*1024*1024, backupCount=5)
+formatter = logging.Formatter(
+        '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 def query_google_traffic(trip_index, trip_id, start_station, end_station, 
                          start_loc, end_loc, sql_db_loc):
     """
-    Queries google maps for duration in traffic. Stores the results in sqlite
-    database.
+    Calls function to query google maps for duration in traffic. Stores the 
+        results in sqlite database.
     
     :param: trip_index: index for the trip. The index is assigned when parsing
         the gfts
@@ -52,21 +63,15 @@ def query_google_traffic(trip_index, trip_id, start_station, end_station,
         from queryinh google
     :type: sql_db_loc: string
     
-    return: None
+    :return: None
     """
-    gmaps = googlemaps.Client(key=config.google_transit_api_key)
+    # query google api    
+    (duration_in_traffic, directions_result) = query_google_api(start_loc,
+                                                                    end_loc)
     # construct time objects
     date_str = dt.datetime.now().date().isoformat()
     time_str = dt.datetime.now().time().isoformat()
     day_of_week = dt.datetime.now().isoweekday()
-    now = dt.datetime.now()
-    #query google maps for the results
-    directions_result = gmaps.directions(start_loc,
-                                     end_loc,
-                                     mode="driving",
-                                     departure_time=now)
-    # duration in traffic in seconds                          
-    duration_in_traffic = directions_result[0]['legs'][0]['duration_in_traffic']['value']
     utc_time = dt.datetime.utcnow().timestamp()
     # create the tuple that is inserted into the database. Ensure that all
     # parameters are the right data type
@@ -82,6 +87,46 @@ def query_google_traffic(trip_index, trip_id, start_station, end_station,
                 + ' on ' + date_str + ' at ' + time_str)
     logging.info(print_str)
     return None   
+
+
+@ten.retry(wait=ten.wait_random_exponential(multiplier=1, max=10),
+       reraise=True, stop=ten.stop_after_attempt(5),
+       before_sleep=ten.before_sleep_log(logger, logging.DEBUG))
+def query_google_api(start_loc,end_loc):
+    """
+    This program queries the google api to determine the driving time between
+        the start and location. The retry wrapper will retry this function if 
+        an error occurs. The method is exponential backoff with jitter and it 
+        will retry 5 times before raising an exception.
+    
+    :param: start_loc: dict that contains the latitude and longitude of the
+        start station
+    :type: start_loc: dictionary
+        
+    :param: end_loc: dict that contains the latitude and longitude of the
+        start station
+    :type: end_loc: dictionary
+    
+    :return: duration_in_traffic: extracted duration in traffic in seconds
+    :type: float
+    
+    :return: directions_result: the results returned by querying googlemaps
+    :type: dictionary
+    
+    """
+    # timeout after 5 seconds    
+    gmaps = googlemaps.Client(key=config.google_transit_api_key,timeout=5)
+    now = dt.datetime.now()
+    #query google maps for the results
+    directions_result = gmaps.directions(start_loc,
+                                     end_loc,
+                                     mode="driving",
+                                     departure_time=now)
+    # duration in traffic in seconds                          
+    duration_in_traffic = (directions_result[0]['legs'][0]
+                                ['duration_in_traffic']['value'])
+    return (duration_in_traffic, directions_result)
+
 
 def run_tasks(sql_loc):
     """
@@ -101,18 +146,9 @@ def run_tasks(sql_loc):
     return None
 
 def main():   
-    # rename the old logger
-    new_logfile_name = ''
-    if os.path.isfile(config.log_file):
-        new_logfile_name = 'SchedulerLog-{date:%Y-%m-%d_%H-%M-%S}.txt'.format(
-            date=dt.datetime.now())    
-        os.rename(config.log_file, os.path.join(config.logs_dir,
-                                                new_logfile_name))
-    # save the process data monitor
-    eh.restart_push_notify(config.output_database,new_logfile_name)
-    # create a new logger 
-    logging.basicConfig(filename=config.log_file, level=logging.INFO, 
-                        format = '%(asctime)s - %(levelname)s - %(message)s')
+    # save the process data monitor and send a push notification
+    eh.restart_push_notify(config.output_database,log_filename)
+    # run the task 
     run_tasks(config.scheduler_sql_loc) 
     
 if __name__ == '__main__':

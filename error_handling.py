@@ -1,9 +1,10 @@
-# -*- coding: utf-8 -*-
 """
-@author: Robert Hennessy (rghennessy@gmail.com)
+Description: This program is to do some of the error handling: 
+1. Sends a pushnotification if the program restarts
+2. Every night compares the expected number of results to the actual number of
+results. Sends a push notification with the results from this check.
 
-Description: This program is to do some of the error handling 
-
+@author: Robert Hennessy (robertghennessy@gmail.com)
 """
 import datetime as dt
 import config
@@ -15,7 +16,7 @@ week_names_sched_trips = ['monday', 'tuesday', 'wednesday', 'thursday',
                           'friday', 'saturday', 'sunday']
 
 def restart_push_notify(sql_db_loc, log_name):
-    '''
+    """
     Record that a restart has occurred and do a push notification    
     
     :param: sql_db_loc: location of the database file
@@ -25,7 +26,7 @@ def restart_push_notify(sql_db_loc, log_name):
     :type: log_name: string
 
     : return: None
-    '''
+    """
     # delay between the push notifications in seconds
     delay_between_push = 60*60
     # create the time and date objects
@@ -56,7 +57,7 @@ def restart_push_notify(sql_db_loc, log_name):
     
 
 def send_push_notification(title_str, body_str):
-    '''
+    """
     Send a push notification to the phone
     
     :param: title_str: title of the push notification
@@ -66,14 +67,14 @@ def send_push_notification(title_str, body_str):
     :type: body_str: string
 
     : return: None
-    '''
+    """
     # send a push notification to phone when the program has restarted
     client = pushover.Client(config.pushover_user_key, 
                              api_token=config.pushover_api_key)
     client.send_message(body_str, title=title_str)
 
 def nightly_check(sql_db_loc,expected_num):
-    '''
+    """
     Compare the amount of data stored in the the previous day to desired 
     amount. Send push notification with the result
     
@@ -84,7 +85,7 @@ def nightly_check(sql_db_loc,expected_num):
     :type: expected_num: int
 
     : return: None
-    '''
+    """
     utc_time_prev = (dt.datetime.utcnow() + dt.timedelta(days=-1)) 
     utc_time_prev = utc_time_prev.timestamp()
     # determine if a push notification occurred during the desired time period
@@ -105,7 +106,7 @@ def nightly_check(sql_db_loc,expected_num):
 
 
 def des_num_meas(csv_path, day_of_week):
-    '''
+    """
     Determine the number of measurements that should occur during a given day
     of the week
     
@@ -116,7 +117,7 @@ def des_num_meas(csv_path, day_of_week):
     :type: day_of_week: int
 
     : return: None
-    '''
+    """
     df = pd.read_csv(csv_path, index_col=0)
     trips_today = df[df[week_names_sched_trips[day_of_week]] == 1]
     return trips_today.shape[0]
