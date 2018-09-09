@@ -1,6 +1,5 @@
 """
-Description: This program parses a gfts file and creates a task database which 
-    will be used by collect_traffic_data
+Description: This program parses a gfts file.
     
 @author: Robert Hennessy (robertghennessy@gmail.com)
 """
@@ -11,18 +10,36 @@ import partridge as ptg
 import pandas as pd
 from itertools import permutations
 import config
-from apscheduler.schedulers.background import BackgroundScheduler
-import collect_traffic_data as ctd
 import sql_functions as sf
+import logging, logging.handlers
+import scheduler_functions as sched
+import data_collection_functions as dcf
+import other_functions as of
 
-# Commute hours in hours in 24 hour format. Only trips within this window 
-# will be outputted
+# set up the root logger
+logger = logging.getLogger('')
+logger.setLevel(logging.INFO)
+dateTag = dt.datetime.now().strftime("%Y-%b-%d_%H-%M-%S")
+log_filename = config.prepare_log_file % dateTag
+# add a rotating handler, rotate the file every 10 mb. Keep the last 5 logfiles
+handler = logging.handlers.RotatingFileHandler(log_filename, 
+                                    maxBytes=10*1024*1024, backupCount=5)
+formatter = logging.Formatter(
+        '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+# determine which days that data is collected
+day_of_interest_start = 0
+# + 1 - slice does not include end
+day_of_interest_end = 4 + 1
+
+####### variables for collecting transit data
+# Only trips within this window will be collected
 morning_commute_hours = [6.5,9.5]
 evening_commute_hours = [17,20.25]
-weekday_names = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 
-                 'saturday', 'sunday']
-days_of_interest = weekday_names[0:5]
-day_of_week_codes = ['mon','tue','wed','thu','fri','sat','sun']
+days_of_interest = config.weekday_names[day_of_interest_start:
+    day_of_interest_end]
 
 # top 10 stations come from http://www.caltrain.com/Assets/_Marketing/
 # caltrain/pdf/2016/2017+Annual+Count+Key+Findings+Report.pdf
@@ -38,58 +55,22 @@ stations = ['San Francisco',
                    'Sunnyvale',
                    'Hillsdale',
                    'San Mateo']
-
 # The following line is used to exclude the bus shuttle stations
 stop_id_upper_limit = 70500
 
-def parse_timeseries(time_series):
-    """    
-    Splits the time_series into hours, minutes and seconds
-    
-    :param: time_series: a series that contains the time strings
-    :type: time_series: series
-    
-    :return: hours: hours
-    :type: int
-    
-    :return: mins: minutes
-    :type: int
-    
-    :return: secs: seconds
-    :type: int
-    
-    """    
-    split_time = time_series.str.split(':')
-    hours = pd.to_numeric(split_time.str[0].str.strip())
-    mins = pd.to_numeric(split_time.str[1].str.strip())
-    secs = pd.to_numeric(split_time.str[2].str.strip())
-    return (hours, mins, secs)
+
+####### variables for collecting traffic data
+# added extra to catch delays, time in hours
+collect_transit_time = [morning_commute_hours[0],
+                         evening_commute_hours[1]+2.25]
+# frequency that the data is collected in minutes
+collect_transit_frequency = 5
+# create the day code to use by scheduler
+collect_transit_day_code = ','.join(config.day_of_week_codes[
+    day_of_interest_start:day_of_interest_end])
 
 
-def trip_timedelta(time_series):
-    """
-    Converts the time series to a timedelta object
-    
-    :param: time_series: a series that contains the time strings
-    :type: time_series: series
-
-    : return: pandas timedelta object
-    """
-    (hours, mins, secs) = parse_timeseries(time_series)
-    return pd.to_timedelta(60*60*hours+60*mins+secs, unit='s')
-    
-def seconds_from_midnight(time_series):
-    """
-    Converts the time series to seconds from midnight
-    
-    :param: time_series: a series that contains the time strings
-    :type: time_series: series
-
-    : return: pandas timedelta object
-    """
-    (hours, mins, secs) = parse_timeseries(time_series)
-    return pd.Series(60*60*hours+60*mins+secs)
-
+###### Start of functions
 
 def trip_list_df(trip_list, stops_df):
     """
@@ -124,7 +105,7 @@ def trip_list_df(trip_list, stops_df):
     return trip_df
 
 
-def parse_gfts(stations, zip_path, csv_out_path, schedule_monitor_csv_path):
+def parse_gfts(stations, zip_path, csv_out_path, schedule_monitor_csv):
     """
     Parases the gfts file and outputs a csv file containing information for 
         selected trips
@@ -139,7 +120,7 @@ def parse_gfts(stations, zip_path, csv_out_path, schedule_monitor_csv_path):
     :param: csv_out_path: file location of the output csv file
     :type: string
     
-    :param: schedule_monitor_csv_path: file location of the schedule monitor
+    :param: schedule_monitor_csv: file location of the schedule monitor
         csv file
     :type: string
     
@@ -160,21 +141,21 @@ def parse_gfts(stations, zip_path, csv_out_path, schedule_monitor_csv_path):
     train_numbers = list(set(schedule.trip_id))
     # normal train are numbers only
     train_numbers = [numb for numb in train_numbers if(str.isnumeric(numb))]
+    # create short stop name - remove caltrain from the end of the name
+    stops['short_stop_name'] = stops['stop_name'].str.split(
+                                    'Caltrain',1).str[0].str.strip()    
+    # create the schedule monitor
+    create_schedule_monitor_csv(schedule,stops,schedule_monitor_csv)
     # remove the special trains
     schedule = schedule[schedule['trip_id'].isin(train_numbers)] 
     # convert the trip id to a number
     #schedule['trip_id'] = pd.to_numeric(schedule['trip_id'])
-    # create the schedule monitor
-    create_schedule_monitor_csv(schedule,schedule_monitor_csv_path)
     # Create new columns with seconds since midnight of the first day because 
     # some of the trains arrive on the following day
-    schedule['arrival_time_timedelta'] = trip_timedelta(
+    schedule['arrival_time_timedelta'] = dcf.trip_timedelta(
                                             schedule['arrival_time'])
-    schedule['departure_time_timedelta'] = trip_timedelta(
+    schedule['departure_time_timedelta'] = dcf.trip_timedelta(
                                             schedule['departure_time'])
-    # create short stop name - remove caltrain from the end of the name
-    stops['short_stop_name'] = stops['stop_name'].str.split(
-                                    'Caltrain',1).str[0].str.strip()
     # create a list of stations from north to south
     # drop the shuttle station, drop the duplicates, reset thse index 
     station_series = stops[stops['stop_id'] < stop_id_upper_limit][
@@ -247,7 +228,7 @@ def parse_gfts(stations, zip_path, csv_out_path, schedule_monitor_csv_path):
     return None
 
 
-def create_schedule_monitor_csv(schedule,csv_out_path):
+def create_schedule_monitor_csv(schedule, stops, csv_out_path):
     """ 
     Parses the schedule and creates a csv file to use to determine on time 
         performance
@@ -260,103 +241,56 @@ def create_schedule_monitor_csv(schedule,csv_out_path):
     
     :return: None
     """
-    schedule['arrival_time_seconds'] = seconds_from_midnight(
+    schedule['scheduled_arrival_time_seconds'] = dcf.seconds_from_midnight(
                                             schedule['arrival_time'])
-    schedule['departure_time_seconds'] = seconds_from_midnight(
+    schedule['scheduled_departure_time_seconds'] = dcf.seconds_from_midnight(
                                             schedule['departure_time'])
+    schedule = pd.merge(schedule, stops, on='stop_id', how='inner')
     schedule.to_csv(csv_out_path, columns  = ['trip_id', 'stop_id', 
-                                          'arrival_time_seconds', 
-                                          'departure_time_seconds'])
+                                              'short_stop_name',
+                                              'scheduled_arrival_time_seconds', 
+                                              'scheduled_departure_time_seconds'])
     return None
 
-def create_job_database(function_to_run, csv_path_in, sched_sql_loc, 
-                        out_sql_loc):
-    """
-    Create the job database that the scheduler uses.
-    
-    :param: function_to_run: The function that is being scheduled
-    :type: csv_path_in: function   
-    
-    :param: csv_path_in: The path to the csv file that contains the trip
-        information. 
-    :type: csv_path_in: string
-    
-    :param: sched_sql_loc: location of the sql job database generated by 
-        this program and used by the scheduler
-    :type: sched_sql_loc: string
-    
-    :param: out_sql_loc: location of the sql job database that the scheduled
-        task stors its results
-    :type: sched_sql_loc: string
-    
-    :return: None
-    """
-    schedule_trips = pd.read_csv(csv_path_in, index_col=0)
-    schedule_trips = schedule_trips.sort_values([
-        'departure_time_timedelta_start', 'arrival_time_timedelta_stop'])
-    schedule_trips_index = schedule_trips.index
-    # If the scheduler file exists, delete it
-    if os.path.isfile(sched_sql_loc):
-        os.remove(sched_sql_loc)
-    else:    ## Show an error ##
-        print("Error: %s file not found" % sched_sql_loc)
-    # create the scheduler object and associate the job database with it
-    scheduler = BackgroundScheduler()
-    scheduler.add_jobstore('sqlalchemy', url='sqlite:///%s' % sched_sql_loc)
-    # loop through all of the trips and add them to the jobs database
-    for sInd in range(len(schedule_trips)):
-            trip = schedule_trips.loc[sInd]
-            trip_index = schedule_trips_index[sInd]
-            trip_id = trip['trip_id']
-            start_station = trip['short_stop_name_start']
-            end_station = trip['short_stop_name_stop']
-            # create the location dictionaries
-            start_loc = {
-                "lat" : trip['stop_lat_start'],
-                "lng" : trip['stop_lon_start']
-            }
-            end_loc = {
-                "lat" : trip['stop_lat_stop'],
-                "lng" : trip['stop_lon_stop']
-            }         
-            sched_time = dt.datetime.strptime(trip['departure_time_start'],
-                                           "%H:%M:%S")
-            day_code =''
-            for day_ind in range(len(weekday_names)):
-                if trip[weekday_names[day_ind]]:
-                    if day_code == '':
-                        day_code = day_code + day_of_week_codes[day_ind]
-                    else :
-                        day_code = day_code + ',' + day_of_week_codes[day_ind]
-            # misfire_grace_time - seconds after the designated runtime that 
-                # the job is still allowed to be run
-            scheduler.add_job(function_to_run,'cron',day_of_week=day_code, 
-                              hour=sched_time.hour, minute=sched_time.minute, 
-                              misfire_grace_time=120,id=str(trip_index),
-                              args=[trip_index, trip_id, start_station, 
-                                    end_station, start_loc, end_loc, 
-                                    out_sql_loc])
-    scheduler.print_jobs()
-    scheduler.start()
-    scheduler.shutdown()
-    return None
 
 def main():
-    if os.path.isfile(config.trips_csv_path_out):
-        os.remove(config.trips_csv_path_out)
-    else:    # Show an error #
-        print("Error: %s file not found" % config.trips_csv_path_out)
-    if os.path.isfile(config.scheduler_sql_loc):
-        os.remove(config.scheduler_sql_loc)
-    else:    # Show an error #
-        print("Error: %s file not found" % config.scheduler_sql_loc)
-    parse_gfts(stations,config.gtfs_zip_path, config.trips_csv_path_out, 
-               config.schedule_monitor_csv_path)
-    create_job_database(ctd.query_google_traffic, config.trips_csv_path_out, 
-                        config.scheduler_sql_loc, config.output_database)
+    # remove the  files
+    of.remove_files([config.trips_csv, 
+                     config.scheduler_sql,
+                     config.process_monitor_sql])
+    # parse the gfts
+    parse_gfts(stations,config.gtfs_zip_path, config.trips_csv, 
+               config.schedule_monitor_csv)       
+    #  Add the traffic jobs
+    sched.add_traffic_jobs(dcf.query_google_traffic, config.trips_csv, 
+                        config.scheduler_sql, config.traffic_data_sql)
+    # Add the transit jobs
+    time_df = sched.create_collect_time(collect_transit_time,
+                                    collect_transit_frequency,
+                                    collect_transit_day_code,
+                                    config.periodic_jobs_csv)
+    # read in the scheduler monitor
+    schedule_monitor = pd.read_csv(config.schedule_monitor_csv, 
+                               index_col=0)
+    schedule_monitor.set_index(['trip_id','stop_id'], inplace=True)
+    # add in the siri periodic jobs
+    sched.add_periodic_job(config.scheduler_sql, 
+                          dcf.query_transit_data_siri, time_df, 
+                          config.sched_id_dict['siri'], 
+                          [config.transit_data_sql , schedule_monitor])
+    # add in the gtfs-rt periodic jobs
+    sched.add_periodic_job(config.scheduler_sql, 
+                          dcf.query_transit_data_gtfs_rt, time_df, 
+                          config.sched_id_dict['gtfs-rt'], 
+                          [config.transit_data_sql , schedule_monitor])
+    
+    
     # create the trip data table
-    sf.create_trip_data_table(config.output_database)
-    sf.create_proc_monitor_table(config.output_database)
+    sf.create_traffic_data_table(config.traffic_data_sql)
+    sf.create_proc_monitor_table(config.process_monitor_sql)
+    sf.create_push_monitor_table(config.process_monitor_sql)
+    sf.create_transit_data_siri_table(config.transit_data_sql)
+    sf.create_transit_data_gtfs_rt_table(config.transit_data_sql)
       
 if __name__ == '__main__':
     main()

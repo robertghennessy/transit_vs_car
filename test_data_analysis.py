@@ -111,7 +111,7 @@ def main():
         os.remove(config.test_results_database)
     sf.create_results_table(config.test_results_database)
     if not os.path.exists(config.trips_tst_csv_path):
-        ts.create_tst_csv(config.trips_csv_path_in,config.trips_tst_csv_path)   
+        ts.create_tst_csv(config.trips_csv,config.trips_tst_csv_path)   
     create_test_data_database(config.trips_tst_csv_path, config.test_data_db)
     da.create_plots(config.trips_tst_csv_path, config.test_data_db, 
                     config.test_results_database, ecdf_dir, hist_dir, time_dir)

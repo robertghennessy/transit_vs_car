@@ -19,9 +19,6 @@ from dateutil import tz
 
 # Take train if train fraction is greater than this number
 take_train_fract = 0.5
-# time zones used for converting time stamp
-to_zone = tz.gettz('America/San_Francisco')
-from_zone = tz.gettz('UTC')
 
   
 def create_plots(csv_path_in, data_db_loc, results_db_loc, 
@@ -49,26 +46,26 @@ def create_plots(csv_path_in, data_db_loc, results_db_loc,
     # read in the schedule trips
     schedule_trips = pd.read_csv(csv_path_in, index_col=0)
     ## Query the maximum time code in the data
-    utc_max = sf.query_data(data_db_loc,"select max(utc_time) from trip_data")
+    utc_max = sf.query_data(data_db_loc,"select max(utc_time) from traffic_data")
     utc_max = utc_max[0][0]
     # convert the time code to local time
     last_date = dt.datetime.utcfromtimestamp(float(utc_max))
-    last_date = last_date.replace(tzinfo=from_zone)
-    last_date = last_date.astimezone(to_zone)
+    last_date = last_date.replace(tzinfo=config.from_zone)
+    last_date = last_date.astimezone(config.to_zone)
     # query the minimum time code in the data
-    utc_min = sf.query_data(data_db_loc,"select min(utc_time) from trip_data")    
+    utc_min = sf.query_data(data_db_loc,"select min(utc_time) from traffic_data")    
     utc_min = utc_min[0][0]
     # convert the time code to local time
     first_date = dt.datetime.utcfromtimestamp(float(utc_min))
-    first_date = first_date.replace(tzinfo=from_zone)
-    first_date = first_date.astimezone(to_zone) 
+    first_date = first_date.replace(tzinfo=config.from_zone)
+    first_date = first_date.astimezone(config.to_zone) 
     # round the first date to the bginning of the month for plotting
     date_min = first_date.replace(day=1)
     # round the last date to the end of the month for plotting
     date_max = last_date.replace(day=1, month=last_date.month+1)
     # create a list of the trip_index stores in the results database
     trip_index_list = sf.query_data(data_db_loc,
-                                "select distinct trip_index from trip_data")  
+                                "select distinct trip_index from traffic_data")  
     trip_index_list = [x[0] for x in trip_index_list]
     trip_index_list.sort()
     # connect to the data database
@@ -76,7 +73,7 @@ def create_plots(csv_path_in, data_db_loc, results_db_loc,
     for trip_index in trip_index_list:
         print("plotting trip_index = " + str(trip_index))
         # read in the data for a given trip_index
-        sql_query = "select * from trip_data where trip_index = %g" % trip_index
+        sql_query = "select * from traffic_data where trip_index = %g" % trip_index
         data_df = pd.read_sql_query(sql_query, conn)
         # convert the date column to datetime
         data_df['date'] = pd.to_datetime(data_df['date'], format="%Y-%m-%d")
@@ -172,7 +169,7 @@ def main():
         os.remove(config.results_database)
     sf.create_results_table(config.results_database)
     
-    create_plots(config.trips_csv_path_out, config.output_database, 
+    create_plots(config.trips_csv, config.results_summary_sql, 
                  config.results_database, ecdf_dir, hist_dir,time_dir)
     
 if __name__ == '__main__':

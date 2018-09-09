@@ -5,3 +5,6 @@ logs
 plots
 files
 test_plots
+test_files
+test_logs
+scratch

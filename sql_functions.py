@@ -5,7 +5,7 @@ Description: This program creates the sql databases and inserts data into them.
 """
 import sqlite3
 
-def create_connection(db_file, timeout=10):
+def create_connection(db_file, timeout=120):
     """
     Create a database connection to the SQLite database specified by db_file
     
@@ -87,11 +87,10 @@ def query_data(db_location,sql_cmd):
         if conn:
             conn.close() 
 
-
         
-def create_trip_data_table(db_location): 
+def create_traffic_data_table(db_location): 
     """
-    Create the trip data table
+    Create the traffic data table
 
     :param: db_location: location of the database file
     :type: db_location: string  
@@ -99,7 +98,7 @@ def create_trip_data_table(db_location):
     :return: None
     """
     # create a table
-    sql = """CREATE TABLE trip_data
+    sql = """CREATE TABLE traffic_data
                       (date text, time text, utc_time real, 
                        day_of_week integer, trip_index integer, 
                        trip_id integer, start_station text, end_station text, 
@@ -109,9 +108,9 @@ def create_trip_data_table(db_location):
     create_table(db_location,sql)
     return None
 
-def insert_trip_data(db_location, data):
+def insert_traffic_data(db_location, data):
     """
-    Insert the trip data into the database
+    Insert the traffic data into the database
     
     :param: db_location: location of the database file
     :type: db_location: string  
@@ -122,7 +121,7 @@ def insert_trip_data(db_location, data):
     :return: None
     """
  
-    sql = """ INSERT INTO trip_data(date, time, utc_time, day_of_week, 
+    sql = """ INSERT INTO traffic_data(date, time, utc_time, day_of_week, 
                                     trip_index, trip_id, start_station, 
                                     end_station, start_loc, end_loc, 
                                     directions_result, duration_in_traffic) 
@@ -167,7 +166,46 @@ def insert_process_monitor(db_location, data):
               VALUES(?,?,?,?,?,?) """
     insert_data(db_location, sql, data)
     return None
+ 
+
+def create_push_monitor_table(db_location): 
+    """
+    Create the push monitor table
+
+    :param: db_location: location of the database file
+    :type: db_location: string  
+
+    :return: None
+    """
+    # create a table
+    sql = """CREATE TABLE push_monitor
+                      (date text, time text, utc_time real, 
+                      day_of_week integer, push_notify integer, 
+                      function text) 
+                   """
+    create_table(db_location,sql)
+    return None
+
+
+def insert_push_monitor(db_location, data):
+    """
+    Insert the push monitor data into the database
     
+    :param: db_location: location of the database file
+    :type: db_location: string  
+    
+    :param: data: data tuple to be inserted into the database
+    :type: data: tuple    
+    
+    :return: None
+    """
+ 
+    sql = """ INSERT INTO process_monitor(date, time, utc_time, day_of_week, 
+                                    push_notify, function) 
+              VALUES(?,?,?,?,?,?) """
+    insert_data(db_location, sql, data)
+    return None    
+   
 
 def create_results_table(db_location): 
     """
@@ -208,4 +246,76 @@ def insert_results(db_location, data):
                       take_train, sched_trip_time, count, filename) 
               VALUES(?,?,?,?,?,?,?,?,?,?,?) """
     insert_data(db_location, sql, data)
+    return None
+
+    
+def create_transit_data_siri_table(db_location): 
+    """
+    Create the transit data table
+
+    :param: db_location: location of the database file
+    :type: db_location: string  
+
+    :return: None
+    """
+    # create a table
+    sql = """CREATE TABLE transit_data_siri
+                      (time_index int, 
+                      trip_id text, 
+                      stop_id integer, 
+                      RecordedAtTime_date text, 
+                      RecordedAtTime_time text, 
+                      RecordedAtTime_utc real, 
+                      StationName text, 
+                      short_stop_name text,  
+                      VehicleAtStop text, 
+                      AimedArrivalTime_date text, 
+                      AimedArrivalTime_time text, 
+                      AimedArrivalTime_utc real, 
+                      AimedArrivalTime_seconds real, 
+                      scheduled_arrival_time_seconds real, 
+                      ArrivalOnTime int, 
+                      ArrivalDelay real, 
+                      AimedDepartureTime_date text,
+                      AimedDepartureTime_time text, 
+                      AimedDepartureTime_utc real,
+                      AimedDepartureTime_seconds real, 
+                      scheduled_departure_time_seconds real,
+                      DeperatureOnTime int, 
+                      DeperatureDelay real
+                      ) 
+                   """
+    create_table(db_location,sql)
+    return None
+
+
+def create_transit_data_gtfs_rt_table(db_location): 
+    """
+    Create the transit data table
+
+    :param: db_location: location of the database file
+    :type: db_location: string  
+
+    :return: None
+    """
+    # create a table
+    sql = """CREATE TABLE transit_data_gtfs_rt
+                      (time_index int, 
+                      RecordedAtTime_date text, 
+                      RecordedAtTime_time text, 
+                      RecordedAtTime_utc real, 
+                      stop_id int, 
+                      short_stop_name text,
+                      trip_id text, 
+                      AimedDepartureTime_date text, 
+                      AimedDepartureTime_time text, 
+                      AimedDepartureTime_utc real,
+                      AimedDepartureTime_seconds real,
+                      scheduled_arrival_time_seconds real,
+                      scheduled_departure_time_seconds real,
+                      DeperatureOnTime int, 
+                      DeperatureDelay real
+                      ) 
+                   """
+    create_table(db_location,sql)
     return None
