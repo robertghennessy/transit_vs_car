@@ -7,9 +7,10 @@ results. Sends a push notification with the results from this check.
 @author: Robert Hennessy (robertghennessy@gmail.com)
 """
 import datetime as dt
+import pandas as pd
+
 import config
 import sql_functions as sf
-import pandas as pd
 import push_notification as pn
 
 week_names_sched_trips = ['monday', 'tuesday', 'wednesday', 'thursday', 

@@ -5,16 +5,18 @@ Description: This program parses a gfts file.
 """
 
 import datetime as dt
-import os
-import partridge as ptg
-import pandas as pd
 from itertools import permutations
-import config
-import sql_functions as sf
 import logging, logging.handlers
-import scheduler_functions as sched
+import numpy as np
+import pandas as pd
+
+import partridge as ptg
+
+import config
 import data_collection_functions as dcf
-import other_functions as of
+import file_functions as ff
+import scheduler_functions as sched
+import sql_functions as sf
 
 # set up the root logger
 logger = logging.getLogger('')
@@ -245,17 +247,20 @@ def create_schedule_monitor_csv(schedule, stops, csv_out_path):
                                             schedule['arrival_time'])
     schedule['scheduled_departure_time_seconds'] = dcf.seconds_from_midnight(
                                             schedule['departure_time'])
+    schedule['trip_start_date_delta'] = -(np.floor(
+        schedule['scheduled_departure_time_seconds'] /(60*60*24)))
     schedule = pd.merge(schedule, stops, on='stop_id', how='inner')
     schedule.to_csv(csv_out_path, columns  = ['trip_id', 'stop_id', 
-                                              'short_stop_name',
-                                              'scheduled_arrival_time_seconds', 
-                                              'scheduled_departure_time_seconds'])
+                                      'short_stop_name',
+                                      'scheduled_arrival_time_seconds', 
+                                      'scheduled_departure_time_seconds',
+                                      'trip_start_date_delta'])
     return None
 
 
 def main():
     # remove the  files
-    of.remove_files([config.trips_csv, 
+    ff.remove_files([config.trips_csv, 
                      config.scheduler_sql,
                      config.process_monitor_sql])
     # parse the gfts
@@ -289,8 +294,10 @@ def main():
     sf.create_traffic_data_table(config.traffic_data_sql)
     sf.create_proc_monitor_table(config.process_monitor_sql)
     sf.create_push_monitor_table(config.process_monitor_sql)
-    sf.create_transit_data_siri_table(config.transit_data_sql)
-    sf.create_transit_data_gtfs_rt_table(config.transit_data_sql)
+    sf.create_transit_data_siri_table(config.siri_table_name, 
+                                      config.transit_data_sql)
+    sf.create_transit_data_gtfs_rt_table(config.gfts_rt_table_name,
+                                         config.transit_data_sql)
       
 if __name__ == '__main__':
     main()

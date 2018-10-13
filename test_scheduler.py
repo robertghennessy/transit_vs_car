@@ -7,16 +7,17 @@ of the trip csv file
 """
 
 import datetime as dt
-import sys
-import sql_functions as sf
-import os
-import config
-import pandas as pd
-import scheduler_functions as sched
 import logging
-import push_notification as pn
+import os
+import pandas as pd
+import sys
+
+import config
 import data_collection_functions as dcf
-import other_functions as of
+import file_functions as ff
+import push_notification as pn
+import scheduler_functions as sched
+import sql_functions as sf
 
 # set up the root logger
 logger = logging.getLogger('')
@@ -83,13 +84,14 @@ def create_tst_csv(csv_file_loc,test_csv_file_loc):
 
 def main():    
     # remove the test files
-    of.remove_files([config.test_traffic_data_sql, 
+    ff.remove_files([config.test_traffic_data_sql, 
                      config.test_process_monitor_sql,
                      config.test_scheduler_sql,
                      config.test_transit_data_sql])    
     # create the sql tables
     sf.create_traffic_data_table(config.test_traffic_data_sql)
-    sf.create_transit_data_siri_table(config.test_transit_data_sql)
+    sf.create_transit_data_siri_table(config.siri_table_name,
+                                      config.test_transit_data_sql)
     sf.create_proc_monitor_table(config.test_process_monitor_sql)
     sf.create_push_monitor_table(config.test_process_monitor_sql)
     # create the tst csv

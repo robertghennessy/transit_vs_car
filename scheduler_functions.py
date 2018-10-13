@@ -6,12 +6,15 @@ Description: This file contains all functions that are related to the
 """
 
 import datetime as dt
+import numpy as np
 import pandas as pd
+
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+
 import config
-import numpy as np
+
 
 job_identifier = {'traffic':'trf-', 'transit-siri':'t_siri-', 
                   'transit-gtfs-rt':'t_gtfs_rt-'}

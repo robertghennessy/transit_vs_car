@@ -1,4 +1,3 @@
-/config.py
 /csv_files
 /__pycache__
 logs
@@ -8,3 +7,4 @@ test_plots
 test_files
 test_logs
 scratch
+/private_config.py

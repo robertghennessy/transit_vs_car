@@ -12,16 +12,17 @@ Steps:
 
 """
 
-import pandas as pd
-import config
-import os
-import sql_functions as sf 
-import numpy as np
-import matplotlib.pyplot as plt
-import shutil
-import data_analysis as da
-import test_scheduler as ts
 import datetime as dt
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import pandas as pd
+import shutil
+
+import config
+import data_analysis as da
+import sql_functions as sf 
+import test_scheduler as ts
 
 # Take train if train fraction is greater than this number
 take_train_fract = 0.5

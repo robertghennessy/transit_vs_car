@@ -1,5 +1,6 @@
 """
-Description: This program creates the sql databases and inserts data into them.
+Description: This file contains all sql_functions. This includes creating a 
+    connection, creating tables, inserting data, updating entries and so on.
 
 @author: Robert Hennessy (robertghennessy@gmail.com)
 """
@@ -229,7 +230,7 @@ def create_results_table(db_location):
 
 def insert_results(db_location, data):
     """
-    Insert theresults into the database
+    Insert the results into the database
     
     :param: db_location: location of the database file
     :type: db_location: string  
@@ -249,9 +250,12 @@ def insert_results(db_location, data):
     return None
 
     
-def create_transit_data_siri_table(db_location): 
+def create_transit_data_siri_table(name, db_location): 
     """
-    Create the transit data table
+    Create the siri transit data table
+
+    :param: name: name of the table
+    :type: string
 
     :param: db_location: location of the database file
     :type: db_location: string  
@@ -259,10 +263,11 @@ def create_transit_data_siri_table(db_location):
     :return: None
     """
     # create a table
-    sql = """CREATE TABLE transit_data_siri
-                      (time_index int, 
+    sql = """CREATE TABLE %s
+                      (TrainStartDate text,
                       trip_id text, 
-                      stop_id integer, 
+                      stop_id integer,
+                      time_index int, 
                       RecordedAtTime_date text, 
                       RecordedAtTime_time text, 
                       RecordedAtTime_utc real, 
@@ -284,14 +289,17 @@ def create_transit_data_siri_table(db_location):
                       DeperatureOnTime int, 
                       DeperatureDelay real
                       ) 
-                   """
+                   """ % name
     create_table(db_location,sql)
     return None
 
 
-def create_transit_data_gtfs_rt_table(db_location): 
+def create_transit_data_gtfs_rt_table(name, db_location): 
     """
     Create the transit data table
+    
+    :param: name: the name of the table
+    :type: string
 
     :param: db_location: location of the database file
     :type: db_location: string  
@@ -299,8 +307,9 @@ def create_transit_data_gtfs_rt_table(db_location):
     :return: None
     """
     # create a table
-    sql = """CREATE TABLE transit_data_gtfs_rt
-                      (time_index int, 
+    sql = """CREATE TABLE %s
+                      (TrainStartDate text,
+                      time_index int, 
                       RecordedAtTime_date text, 
                       RecordedAtTime_time text, 
                       RecordedAtTime_utc real, 
@@ -316,6 +325,219 @@ def create_transit_data_gtfs_rt_table(db_location):
                       DeperatureOnTime int, 
                       DeperatureDelay real
                       ) 
-                   """
+                   """ % name
+                   
     create_table(db_location,sql)
     return None
+
+
+def where_statement_common_entries(table_modified, table_base, 
+                                   columns_to_compare):
+    """     
+    :param: table_modified: the name of the table to be modified
+    :type: string
+    
+    :param: table_base: the name of the base table 
+    :type: string
+    
+    :param: columns_to_compare: a list of the columns to compare
+    :type: list
+    
+    :return: where_statement: where statement to find common entries
+    :type: where_statemet: string
+    """
+    where_statement = ""
+    numb_of_compare = len(columns_to_compare)
+    for cInd in range(numb_of_compare):
+        new_where = '%s.%s = %s.%s' % (table_modified, 
+                                       columns_to_compare[cInd], 
+                                       table_base,
+                                       columns_to_compare[cInd])
+        where_statement = where_statement + new_where
+        if cInd <= numb_of_compare - 2:
+            where_statement = where_statement + ' AND '
+    return where_statement
+    
+
+def delete_entries_in_common(table_modified, table_base, 
+                          columns_to_compare):
+    """
+    Construct sql_query to delete common entries
+    
+    :param: table_modified: the name of the table to be modified
+    :type: string
+    
+    :param: table_base: the name of the base table 
+    :type: string
+    
+    :param: columns_to_compare: a list of the columns to compare
+    :type: list
+    
+    :return: sql_query: query used to delete rows in common
+    :type: sql_query: string
+    """
+
+    # Construct the where statement
+    where_statement = where_statement_common_entries(table_modified, 
+                                                     table_base,
+                                                     columns_to_compare)
+    # construct the sql_query
+    sql_query = 'delete from %s where exists (select * from %s where %s)' % (
+                    table_modified, table_base, where_statement)
+    return sql_query
+
+
+def copy_new_entries(table_modified, table_base, columns_to_compare):
+    """
+    Construct sql_query to copy new entries entries
+    
+    :param: table_modified: the name of the table to be modified
+    :type: string
+    
+    :param: table_base: the name of the base table 
+    :type: string
+    
+    :param: columns_to_compare: a list of the columns to compare
+    :type: list
+    
+    :return: sql_query: query used to new entries in common
+    :type: sql_query: string
+    """
+
+    # Construct the where statement
+    where_statement = where_statement_common_entries(table_modified, 
+                                                     table_base,
+                                                     columns_to_compare)
+    # construct the sql_query
+    sql_query = ('Insert into %s select * from %s where not exists (select * '
+                    'from %s where %s)') % (table_modified, table_base, 
+                    table_modified, where_statement)
+    return sql_query
+
+
+def sql_delete_table(table_name):
+    """
+    Construct sql statement to delete a table
+    
+    :param: table_name: the name of the table to be deleted
+    :type: table_name: string
+    
+    :return: sql_query: the sql query to delete a table
+    :type: sql_query: string
+    """
+    sql_query = 'drop table %s' % table_name
+    return sql_query
+
+
+def update_entries(db_location, table_modified, data, columns_to_compare):
+    """
+    Create a table in the database
+    
+    :param: db_location: location of the database file
+    :type: db_location: string
+     
+    :param: table_modified: name of the string to update
+    :type: table_modified: string   
+    
+    :param: data: pandas dataframe that contains the new data
+    :type: data: pandas dataframe
+    
+    :param: columns_to_compare: a list of the columns to compare to determine
+        if an entry needs to be updated
+    :type: list
+    
+    
+    :return: None
+    """ 
+    temp_table_name = 'temp'
+    conn = None
+    try:
+        conn = create_connection(db_location)
+        cursor = conn.cursor()
+        # copy the data to a temporary table
+        data.to_sql(temp_table_name, conn, if_exists='replace', index=False)
+        # delete entries in the original table that will be replaced
+        sql_cmd = delete_entries_in_common(table_modified, temp_table_name, 
+                                           columns_to_compare)
+        cursor.execute(sql_cmd)
+        # copy over the rows from the temp table
+        sql_cmd = copy_new_entries(table_modified, temp_table_name, 
+                                           columns_to_compare)
+        cursor.execute(sql_cmd)
+        # delete temp table
+        sql_cmd = sql_delete_table(temp_table_name)
+        cursor.execute(sql_cmd)
+        # commit changes        
+        conn.commit()
+    finally:
+        if conn:
+            conn.close()  
+
+            
+def create_table_def_string(input_dict):
+    """
+    This creates a string that will be used for sql table definition.
+    
+    :param: input_dict: a dictionary that contains the sql_name and the 
+        sql_type
+    :type: input_dict: dictionary
+    
+    :return: ret_str:  
+    """
+    key_list = list(input_dict.keys())
+    ret_str = ''
+    for kInd in range(len(key_list)):
+        key = key_list[kInd]
+        ret_str = ret_str + '%s %s' % (input_dict[key]['sql_name'],
+                                       input_dict[key]['sql_type'])
+        if kInd < len(key_list) - 1:
+                ret_str = ret_str + ', '
+    return ret_str
+
+
+def create_table_from_dict(db_location, table_name, table_dict):
+    """
+    This creates a table from the table_dict
+    
+    :param: db_location: location of the database file
+    :type: db_location: string  
+    
+    :param: table_name: the name of the table
+    :type: string
+    
+    :param: table_dict: a dictionary that contains the table definition
+        information
+    :type: table_dict: dictionary
+    
+    :return: None
+    """
+    table_def_string = create_table_def_string(table_dict)
+    sql = """CREATE TABLE %s (%s)""" % (table_name, table_def_string)
+    create_table(db_location,sql)
+    return None
+
+
+def prepare_pandas_to_sql(df, table_dict):
+    """
+    Prepare the pandas dataframe to upload into dataframe. Orders the columns
+    so that they are the same order of the sql database and fill missing
+    columns with NaNs.
+    
+    :param: df: pandas dataframe that will be modified
+    :type: df: pandas dataframe
+    
+    :param: table_dict: dictionary that containts the table definition
+    :type: table_dict: dictionary
+    
+    return: out_df: output pandas dataframe
+    :type: out_df: pandas dataframe
+    """
+    
+    # creates the list to reindex the dataframe
+    ordered_list = []
+    for key in range(len(table_dict)):
+        ordered_list.append(table_dict[key]['pandas_name'])
+    # changes the order of the index, by default empty values = NaN
+    out_df = df.reindex(columns=ordered_list)
+    return out_df
+

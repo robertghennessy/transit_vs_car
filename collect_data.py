@@ -5,8 +5,9 @@ Description: This program was written to collect the data by calling the
 @author: Robert Hennessy (robertghennessy@gmail.com)
 """
 
-import logging, logging.handlers
 import datetime as dt
+import logging, logging.handlers
+
 import config
 import push_notification as pn
 import scheduler_functions as sched

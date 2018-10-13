@@ -4,12 +4,11 @@ Created on Sat Aug 25 15:27:41 2018
 @author: Robert Hennessy (robertghennessy@gmail.com)
 """
 
-import random
-import tenacity as ten
-#from tenacity import retry
 import datetime as dt
 import logging
+import random
 
+import tenacity as ten
 
 #logging.basicConfig(filename='test.log', level=logging.INFO, 
 #                        format = '%(asctime)s - %(levelname)s - %(message)s')

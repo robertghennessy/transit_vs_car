@@ -4,9 +4,12 @@ Description: This file contains functions to send push notifications
 @author: Robert Hennessy (robertghennessy@gmail.com)
 """
 import datetime as dt
+
+import pushover
+
 import config
 import sql_functions as sf
-import pushover
+
 
 delay_train_header=['Train', 'Station', 'Delay (min)']
 delay_traincol_buf = 2

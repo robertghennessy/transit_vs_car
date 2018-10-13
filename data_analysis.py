@@ -5,16 +5,17 @@ Description: Creates the plots (time history, emperical distribution and
 @author: Robert Hennessy (robertghennessy@gmail.com)
 """
 
-import pandas as pd
-import config
-import os
-import sql_functions as sf
-import numpy as np
-import matplotlib.pyplot as plt
-import shutil
-import matplotlib.dates as mdates
 import datetime as dt
 from dateutil import tz
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import pandas as pd
+import shutil
+
+import config
+import sql_functions as sf
 
 
 # Take train if train fraction is greater than this number
