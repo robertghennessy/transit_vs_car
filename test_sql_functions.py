@@ -20,11 +20,11 @@ import test_table_def as ttd
 columns_to_compare = ['TrainStartDate', 'trip_id', 'stop_id']
 
 # delete test database
-ff.remove_files([config.test_transit_data_sql])
+ff.remove_files([config.test_siri_data_sql])
 
 # create the siri table
 sf.create_transit_data_siri_table(config.siri_table_name, 
-                                  config.test_transit_data_sql)
+                                  config.test_siri_data_sql)
 # determine the files to import
 file_to_import = ff.find_files_that_filename_contain(config.test_file_dir, 
                                                      'siri')
@@ -41,13 +41,13 @@ for file in file_to_import:
     parsed_data_with_delays = dcf.compare_actual_to_schedule(parsed_data, 
                                                          schedule_monitor)
     # try updating entries
-    sf.update_entries(config.test_transit_data_sql,
+    sf.update_entries(config.test_siri_data_sql,
                       config.siri_table_name, parsed_data_with_delays, 
                       columns_to_compare)
     time_index = time_index + 1
     
 
-conn = sf.create_connection(config.test_transit_data_sql)
+conn = sf.create_connection(config.test_siri_data_sql)
 cursor = conn.cursor()
 parsed_data_with_delays =  sf.prepare_pandas_to_sql(parsed_data_with_delays, 
                                                     ttd.gtfs_dict)

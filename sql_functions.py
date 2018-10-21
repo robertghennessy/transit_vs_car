@@ -5,8 +5,9 @@ Description: This file contains all sql_functions. This includes creating a
 @author: Robert Hennessy (robertghennessy@gmail.com)
 """
 import sqlite3
+import datetime as dt
 
-def create_connection(db_file, timeout=120):
+def create_connection(db_file, timeout=120, isolation_level=None):
     """
     Create a database connection to the SQLite database specified by db_file
     
@@ -15,7 +16,8 @@ def create_connection(db_file, timeout=120):
     
     :return: Connection object or None
     """
-    conn = sqlite3.connect(db_file, timeout=timeout)
+    conn = sqlite3.connect(db_file, timeout=timeout, 
+                           isolation_level=isolation_level)
     return conn
 
 
@@ -169,6 +171,49 @@ def insert_process_monitor(db_location, data):
     return None
  
 
+def create_periodic_task_monitor_table(db_location): 
+    """
+    Create a periodic task monitor table
+
+    :param: db_location: location of the database file
+    :type: db_location: string  
+
+    :return: None
+    """
+    # create a table
+    sql = """CREATE TABLE periodic_task_monitor
+                      (date text, time text, utc_time real, 
+                      day_of_week integer, time_index int) 
+                   """
+    create_table(db_location,sql)
+    return None
+    
+def insert_periodic_task_monitor(db_location, time_index):
+    """
+    Insert the process monitor data into the database
+    
+    :param: db_location: location of the database file
+    :type: db_location: string  
+    
+    :param: time_index: the index for the periodic call
+    :type: time_index: integer    
+    
+    :return: None
+    """
+    # create the time objects to save the results
+    date_str = dt.datetime.now().date().isoformat()
+    time_str = dt.datetime.now().time().isoformat()
+    day_of_week = dt.datetime.now().isoweekday()
+    utc_time_now = dt.datetime.utcnow().timestamp()
+    task_monitor_data = (str(date_str), str(time_str), float(utc_time_now), 
+                  int(day_of_week),int(time_index))    
+    sql = """ INSERT INTO periodic_task_monitor(date, time, utc_time, 
+                                    day_of_week, time_index)
+              VALUES(?,?,?,?,?) """
+    insert_data(db_location, sql, task_monitor_data)
+    return None
+ 
+
 def create_push_monitor_table(db_location): 
     """
     Create the push monitor table
@@ -182,7 +227,7 @@ def create_push_monitor_table(db_location):
     sql = """CREATE TABLE push_monitor
                       (date text, time text, utc_time real, 
                       day_of_week integer, push_notify integer, 
-                      function text) 
+                      push_name text) 
                    """
     create_table(db_location,sql)
     return None
@@ -201,8 +246,8 @@ def insert_push_monitor(db_location, data):
     :return: None
     """
  
-    sql = """ INSERT INTO process_monitor(date, time, utc_time, day_of_week, 
-                                    push_notify, function) 
+    sql = """ INSERT INTO push_monitor(date, time, utc_time, day_of_week, 
+                                    push_notify, push_name) 
               VALUES(?,?,?,?,?,?) """
     insert_data(db_location, sql, data)
     return None    
@@ -248,7 +293,6 @@ def insert_results(db_location, data):
               VALUES(?,?,?,?,?,?,?,?,?,?,?) """
     insert_data(db_location, sql, data)
     return None
-
     
 def create_transit_data_siri_table(name, db_location): 
     """
@@ -333,7 +377,9 @@ def create_transit_data_gtfs_rt_table(name, db_location):
 
 def where_statement_common_entries(table_modified, table_base, 
                                    columns_to_compare):
-    """     
+    """
+    Construct a sql where statement to compare rows in two different tables.
+     
     :param: table_modified: the name of the table to be modified
     :type: string
     
@@ -429,6 +475,20 @@ def sql_delete_table(table_name):
     return sql_query
 
 
+def sql_delete_table_if_exists(table_name):
+    """
+    Construct sql statement to delete a table if it exists
+    
+    :param: table_name: the name of the table to be deleted
+    :type: table_name: string
+    
+    :return: sql_query: the sql query to delete a table
+    :type: sql_query: string
+    """
+    sql_query = 'drop table if exists %s' % table_name
+    return sql_query
+
+
 def update_entries(db_location, table_modified, data, columns_to_compare):
     """
     Create a table in the database
@@ -449,13 +509,14 @@ def update_entries(db_location, table_modified, data, columns_to_compare):
     
     :return: None
     """ 
-    temp_table_name = 'temp'
+    temp_table_name = table_modified + '_temp'
     conn = None
     try:
-        conn = create_connection(db_location)
+        # create an exclusive connection, no other process can read/write
+        conn = create_connection(db_location, isolation_level='EXCLUSIVE')
         cursor = conn.cursor()
         # copy the data to a temporary table
-        data.to_sql(temp_table_name, conn, if_exists='replace', index=False)
+        data.to_sql(temp_table_name, conn, index=False, if_exists='replace')
         # delete entries in the original table that will be replaced
         sql_cmd = delete_entries_in_common(table_modified, temp_table_name, 
                                            columns_to_compare)

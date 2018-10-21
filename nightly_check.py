@@ -1,6 +1,6 @@
 """
 Description: This program is to do some of the error handling: 
-1. Sends a pushnotification if the program restarts
+1. Sends a push notification if the program restarts
 2. Every night compares the expected number of results to the actual number of
 results. Sends a push notification with the results from this check.
 
@@ -85,16 +85,30 @@ def des_periodic_meas(csv_path, day_of_week):
     return trips_today.shape[0]
        
 def nightly_check_periodic(sql_db_loc, table_name, column_name, 
-                           time_column_name, expected_num):
+                           time_column_name, expected_num, task_name):
     """
     Compare the amount of data stored in the the previous day to desired 
     amount. Send push notification with the result
     
     :param: sql_db_loc: location of the database file
     :type: sql_db_loc: string  
+    
+    :param: table_name: name of table where the data is stored
+    :type: table_name: string  
+    
+    :param: column_name: name of the column to count to compare with the 
+        expected number
+    :type: column_name: string  
+    
+    :param: time_column_name: name of the column that contains the time for 
+        each row
+    :type: time_column_name: string 
         
     :param: expected_num: number of expected rows
     :type: expected_num: int
+    
+    :param: task_name: name of the task. This is sent in the push notification.
+    :type: task_name: string 
 
     : return: None
     """
@@ -107,11 +121,11 @@ def nightly_check_periodic(sql_db_loc, table_name, column_name,
                        utc_time_prev))
     num_rows = sf.query_data(sql_db_loc,rowsQuery)[0][0]
     if num_rows != expected_num:
-        title_str = 'Error: Daily Count: %s' % table_name
+        title_str = 'Error: Daily Count: %s' % task_name
         body_str = 'Desired Count = %d, Actual Count = %d' % (
             expected_num, num_rows)
     else:
-        title_str = 'Pass: Daily Count: %s' % table_name
+        title_str = 'Pass: Daily Count: %s' % task_name
         body_str = 'Desired Count = %d, Actual Count = %d' % (
             expected_num, num_rows)
     pn.send_push_notification(title_str, body_str)    
@@ -120,16 +134,16 @@ def main():
     day_of_week = (dt.datetime.today()+dt.timedelta(days=-1)).weekday()
     desired_number_of_traffic_measurements = des_num_traffic_meas(
                                         config.trips_csv, day_of_week)
-#    nightly_check(config.traffic_data_sql, 'traffic_data',
-#                  desired_number_of_traffic_measurements)
+    nightly_check(config.traffic_data_sql, 'traffic_data',
+                  desired_number_of_traffic_measurements)
     desired_number_of_periodic_measurements = des_periodic_meas(
         config.periodic_jobs_csv,day_of_week)
-    nightly_check_periodic(config.transit_data_sql, 'transit_data_siri',
-                  'time_index', 'RecordedAtTime_utc',
-                  desired_number_of_periodic_measurements)
-    nightly_check_periodic(config.transit_data_sql, 'transit_data_gtfs_rt',
-                  'time_index', 'RecordedAtTime_utc',
-                  desired_number_of_periodic_measurements)
+    nightly_check_periodic(config.siri_data_sql, 'periodic_task_monitor',
+                  'time_index', 'utc_time',
+                  desired_number_of_periodic_measurements, 'siri Data')
+    nightly_check_periodic(config.gtfs_rt_data_sql, 'periodic_task_monitor',
+                  'time_index', 'utc_time',
+                  desired_number_of_periodic_measurements, 'gtfs-rt Data')
 
 if __name__ == '__main__':
     main()

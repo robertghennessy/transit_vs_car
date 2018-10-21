@@ -40,25 +40,26 @@ test_prepare_log_file = os.path.join(test_logs_dir, prepare_log_filename)
 test_transit_log_file = os.path.join(test_logs_dir, transit_log_filename)
 # filenames of the sql databases
 traffic_data_sql_filename = 'taffic_data.sqlite'
-transit_data_sql_filename = 'transit_data.sqlite'
+siri_data_sql_filename = 'siri_data.sqlite'
+gtfs_rt_data_sql_filename = 'gtfs_rt_data.sqlite'
 scheduler_sql_filename = 'tasks.sqlite'
 process_monitor_sql_filename = 'process_monitor.sqlite'
+push_notification_sql_filename = 'push_notification.sqlite'
 results_summary_sql_filename = 'results_summary.sqlite'
 gfts_rt_table_name = 'transit_data_gtfs_rt'
-temp_gfts_rt_table_name = 'temp_' + gfts_rt_table_name
 siri_table_name = 'transit_data_siri'
-temp_siri_table_name = 'temp_' + siri_table_name
-
-
 # sql database locations
 traffic_data_sql = os.path.join(file_dir, traffic_data_sql_filename)
-transit_data_sql = os.path.join(file_dir, transit_data_sql_filename)
+siri_data_sql = os.path.join(file_dir, siri_data_sql_filename)
+gtfs_rt_data_sql = os.path.join(file_dir, gtfs_rt_data_sql_filename)
 scheduler_sql = os.path.join(file_dir, scheduler_sql_filename)
 process_monitor_sql = os.path.join(file_dir, process_monitor_sql_filename)
+push_notification_sql = os.path.join(file_dir, push_notification_sql_filename)
 results_summary_sql = os.path.join(file_dir, results_summary_sql_filename)
 # test sql database locations
 test_traffic_data_sql = os.path.join(test_file_dir, traffic_data_sql_filename)
-test_transit_data_sql = os.path.join(test_file_dir, transit_data_sql_filename)
+test_siri_data_sql = os.path.join(test_file_dir, siri_data_sql_filename)
+test_gtfs_rt_data_sql = os.path.join(test_file_dir, gtfs_rt_data_sql_filename)
 test_scheduler_sql = os.path.join(test_file_dir, scheduler_sql_filename)
 test_process_monitor_sql = os.path.join(test_file_dir, 
                                         process_monitor_sql_filename)

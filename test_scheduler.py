@@ -87,11 +87,11 @@ def main():
     ff.remove_files([config.test_traffic_data_sql, 
                      config.test_process_monitor_sql,
                      config.test_scheduler_sql,
-                     config.test_transit_data_sql])    
+                     config.test_siri_data_sql])    
     # create the sql tables
     sf.create_traffic_data_table(config.test_traffic_data_sql)
     sf.create_transit_data_siri_table(config.siri_table_name,
-                                      config.test_transit_data_sql)
+                                      config.test_siri_data_sql)
     sf.create_proc_monitor_table(config.test_process_monitor_sql)
     sf.create_push_monitor_table(config.test_process_monitor_sql)
     # create the tst csv
@@ -117,12 +117,12 @@ def main():
     sched.add_periodic_job(config.test_scheduler_sql, 
                           dcf.query_transit_data_siri, time_df, 
                           config.sched_id_dict['siri'], 
-                          [config.test_transit_data_sql , schedule_monitor])
+                          [config.test_siri_data_sql , schedule_monitor])
     # add in the gtfs-rt periodic jobs
     sched.add_periodic_job(config.test_scheduler_sql, 
                           dcf.query_transit_data_gtfs_rt, time_df, 
                           config.sched_id_dict['gtfs-rt'], 
-                          [config.test_transit_data_sql , schedule_monitor])
+                          [config.test_gtfs_rt_data_sql , schedule_monitor])
     # save the process data monitor
     #pn.restart_push_notify(test_output_database,new_logfile_name)
     sched.run_tasks(config.test_scheduler_sql) 

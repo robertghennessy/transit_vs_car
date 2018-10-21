@@ -8,6 +8,7 @@ import datetime as dt
 from itertools import permutations
 import logging, logging.handlers
 import numpy as np
+import os
 import pandas as pd
 
 import partridge as ptg
@@ -267,8 +268,8 @@ def main():
     parse_gfts(stations,config.gtfs_zip_path, config.trips_csv, 
                config.schedule_monitor_csv)       
     #  Add the traffic jobs
-    sched.add_traffic_jobs(dcf.query_google_traffic, config.trips_csv, 
-                        config.scheduler_sql, config.traffic_data_sql)
+    #sched.add_traffic_jobs(dcf.query_google_traffic, config.trips_csv, 
+    #                    config.scheduler_sql, config.traffic_data_sql)
     # Add the transit jobs
     time_df = sched.create_collect_time(collect_transit_time,
                                     collect_transit_frequency,
@@ -282,22 +283,29 @@ def main():
     sched.add_periodic_job(config.scheduler_sql, 
                           dcf.query_transit_data_siri, time_df, 
                           config.sched_id_dict['siri'], 
-                          [config.transit_data_sql , schedule_monitor])
+                          [config.siri_data_sql , schedule_monitor])
     # add in the gtfs-rt periodic jobs
     sched.add_periodic_job(config.scheduler_sql, 
                           dcf.query_transit_data_gtfs_rt, time_df, 
                           config.sched_id_dict['gtfs-rt'], 
-                          [config.transit_data_sql , schedule_monitor])
+                          [config.gtfs_rt_data_sql , schedule_monitor])
     
     
-    # create the trip data table
-    sf.create_traffic_data_table(config.traffic_data_sql)
-    sf.create_proc_monitor_table(config.process_monitor_sql)
-    sf.create_push_monitor_table(config.process_monitor_sql)
-    sf.create_transit_data_siri_table(config.siri_table_name, 
-                                      config.transit_data_sql)
-    sf.create_transit_data_gtfs_rt_table(config.gfts_rt_table_name,
-                                         config.transit_data_sql)
+    # create the sql files if they do not exist
+    if not os.path.isfile(config.traffic_data_sql):
+        sf.create_traffic_data_table(config.traffic_data_sql)
+    if not os.path.isfile(config.process_monitor_sql):   
+        sf.create_proc_monitor_table(config.process_monitor_sql)
+    if not os.path.isfile(config.push_notification_sql):
+        sf.create_push_monitor_table(config.push_notification_sql)
+    if not os.path.isfile(config.siri_data_sql):
+        sf.create_transit_data_siri_table(config.siri_table_name, 
+                                          config.siri_data_sql)
+        sf.create_periodic_task_monitor_table(config.siri_data_sql)
+    if not os.path.isfile(config.gtfs_rt_data_sql):
+        sf.create_transit_data_gtfs_rt_table(config.gfts_rt_table_name,
+                                             config.gtfs_rt_data_sql)
+        sf.create_periodic_task_monitor_table(config.gtfs_rt_data_sql)
       
 if __name__ == '__main__':
     main()

@@ -17,6 +17,7 @@ from google.protobuf.json_format import MessageToDict
 import tenacity as ten
 
 import config
+import push_notification as pn
 import sql_functions as sf
 import test_table_def as ttd
 
@@ -24,7 +25,7 @@ agency = 'CT'
 gtfs_rt_api = 'http://api.511.org/Transit/TripUpdates?api_key='
 siri_api = 'http://api.511.org/Transit/StopMonitoring?api_key='
 # send push notification is greater than x minutes
-warn_delay_threhold = 5
+warn_delay_threhold = 5*60
 
 # access the root logger
 logger = logging.getLogger('')
@@ -161,9 +162,15 @@ def query_transit_data_siri(data_db_location, schedule_monitor, time_index):
     parsed_data = parse_siri_transit_data(MonitoredStops, time_index)
     parsed_data_with_delays = compare_actual_to_schedule(parsed_data, 
                                                          schedule_monitor)  
+    save_transit_data(parsed_data_with_delays, 'siri', data_db_location)
+    # Save to task monitor database    
+    sf.insert_periodic_task_monitor(data_db_location, time_index)
+    # determine the delayed trains
     (maxDeperatureDelay, delayed_trains) = determine_delayed_trains(
                                                 parsed_data_with_delays)
-    save_transit_data(parsed_data_with_delays, 'siri', data_db_location)
+    # send a push notification if the trains are delayed significantly
+    if maxDeperatureDelay >= warn_delay_threhold:
+        pn.delay_push_notify(config.push_notification_sql, delayed_trains)
     return None
 
 
@@ -272,9 +279,15 @@ def query_transit_data_gtfs_rt(data_db_location, schedule_monitor, time_index):
     parsed_data = parse_gtfs_rt_transit_data(MonitoredStops, time_index)
     parsed_data_with_delays = compare_actual_to_schedule(parsed_data, 
                                                          schedule_monitor)  
+    save_transit_data(parsed_data_with_delays, 'gtfs-rt', data_db_location)
+    # Save to task monitor database    
+    sf.insert_periodic_task_monitor(data_db_location, time_index)
+    # determine the delayed trains
     (maxDeperatureDelay, delayed_trains) = determine_delayed_trains(
                                                 parsed_data_with_delays)
-    save_transit_data(parsed_data_with_delays, 'gtfs-rt', data_db_location)
+    # send a push notification if the trains are delayed significantly
+    if maxDeperatureDelay >= warn_delay_threhold:
+        pn.delay_push_notify(config.push_notification_sql, delayed_trains)
     return None
 
 
@@ -429,10 +442,17 @@ def determine_delayed_trains(data):
     delayed_trains.reset_index(inplace=True)
     delayed_trains = delayed_trains[['trip_id', 'short_stop_name', 
                                      'DeperatureDelay']]
+    delayed_trains = delayed_trains.sort_values(by='DeperatureDelay', 
+                                                ascending=False, 
+                                                na_position='last')
+    delayed_trains = delayed_trains.loc[
+        delayed_trains['DeperatureDelay'] > warn_delay_threhold]
     maxDeperatureDelay = delayed_trains['DeperatureDelay'].max()
     return (maxDeperatureDelay, delayed_trains)
     
-
+@ten.retry(wait=ten.wait_random_exponential(multiplier=1, max=10),
+       reraise=True, stop=ten.stop_after_attempt(5),
+       before_sleep=ten.before_sleep_log(logger, logging.DEBUG))	
 def save_transit_data(data, type_switch, db_location):
     """
     Saves the transit data to sql database.
@@ -451,28 +471,19 @@ def save_transit_data(data, type_switch, db_location):
     # select the appropiate table names
     if type_switch == 'siri':
         table_name = config.siri_table_name
-        temp_table_name = config.temp_siri_table_name
         data_format_dict = ttd.siri_dict
     elif type_switch == 'gtfs-rt':
         table_name = config.gfts_rt_table_name
-        temp_table_name = config.temp_gfts_rt_table_name
         data_format_dict = ttd.gtfs_dict
     else:
         raise Exception('The type_switch ({}) is not supported'.format(
             type_switch))
     # save the results to sql database
-    conn = None
-    try:
-        #conn = sf.create_connection(db_location, timeout=120)
-        # replace the table if it already exists
-        prepared_data = sf.prepare_pandas_to_sql(data, data_format_dict)
-        sf.update_entries(db_location, table_name, 
-                          prepared_data, columns_to_compare)
-        #prepared_data.to_sql(table_name, conn, if_exists='append', 
-        #                     index=False)
-    finally:
-        if conn:
-            conn.close() 
+    # prepare the pandas data to upload to sql
+    prepared_data = sf.prepare_pandas_to_sql(data, data_format_dict)
+    sf.update_entries(db_location, table_name, 
+                      prepared_data, columns_to_compare)
+
 
 
 """ Time Functions """
@@ -670,14 +681,3 @@ def ordered_unique_list(seq):
     """
     seen = set()
     return [x for x in seq if x not in seen and not seen.add(x)]
-
-#######
-#schedule_monitor = pd.read_csv(config.schedule_monitor_csv, 
-#                              index_col=0)
-#schedule_monitor.set_index(['trip_id','stop_id'], inplace=True)
-##sf.create_transit_data_siri_table(config.siri_table_name, 
-##                                      config.test_transit_data_sql)
-##sf.create_transit_data_gtfs_rt_table(config.gfts_rt_table_name,
-##                                     config.test_transit_data_sql)
-#query_transit_data_siri(config.test_transit_data_sql , schedule_monitor, 1)
-#query_transit_data_gtfs_rt(config.test_transit_data_sql , schedule_monitor, 1)

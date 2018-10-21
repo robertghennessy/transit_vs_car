@@ -10,7 +10,9 @@ import pushover
 import config
 import sql_functions as sf
 
-
+# constants for train delay push notification
+# delay between the push notifications in seconds
+delay_between_push = 5*60
 delay_train_header=['Train', 'Station', 'Delay (min)']
 delay_traincol_buf = 2
 
@@ -45,14 +47,14 @@ def restart_push_notify(sql_db_loc, title_str, log_name):
     : return: None
     """
     # delay between the push notifications in seconds
-    delay_between_push = 60*60
+    delay_between_restart_push = 60*60
     # create the time and date objects
     date_str = dt.datetime.now().date().isoformat()
     time_str = dt.datetime.now().time().isoformat()
     day_of_week = dt.datetime.now().isoweekday()
     utc_time_now = dt.datetime.utcnow().timestamp()
     utc_time_prev = (dt.datetime.now() + 
-                     dt.timedelta(seconds=-delay_between_push)) 
+                     dt.timedelta(seconds=-delay_between_restart_push)) 
     utc_time_prev = utc_time_prev.timestamp()
     # determine if a push notification occurred during the desired time period
     # defined by delay_between_push
@@ -76,7 +78,7 @@ def delay_push_notify(sql_db_loc, delay_df):
     """
      Send a push notification because a train is delay
     
-    :param: sql_db_loc: location of the database process time database
+    :param: sql_db_loc: location of the database push notification database
     :type: sql_db_loc: string  
         
     :param: delay_df: dataframe that contains information about the delayed 
@@ -85,8 +87,6 @@ def delay_push_notify(sql_db_loc, delay_df):
 
     : return: None
     """
-    # delay between the push notifications in seconds
-    delay_between_push = 5*60
     # create the time and date objects
     date_str = dt.datetime.now().date().isoformat()
     time_str = dt.datetime.now().time().isoformat()
@@ -97,8 +97,9 @@ def delay_push_notify(sql_db_loc, delay_df):
     utc_time_prev = utc_time_prev.timestamp()
     # determine if a push notification occurred during the desired time period
     # defined by delay_between_push
-    rowsQuery = ('select count(*) from delay_monitor where utc_time > %f ' 
-                    'and push_notify = 1' % utc_time_prev)            
+    rowsQuery = ('select count(*) from push_monitor where utc_time > %f ' 
+                    'and push_notify = 1 and push_name = \'%s\''  % 
+                    (utc_time_prev, 'delayed_train'))            
     num_rows = sf.query_data(sql_db_loc,rowsQuery)[0][0]
     if num_rows == 0:
         push_notify = 1
@@ -106,13 +107,11 @@ def delay_push_notify(sql_db_loc, delay_df):
         body_str = construct_delay_text(delay_df, delay_train_header, 
                                         delay_traincol_buf)
         send_push_notification(title_str, body_str)
-    else:
-        push_notify = 0
-    # create the tuple that is inserted into the database. Ensure that all
-    # parameters are the right data type
-    data_tuple = (str(date_str), str(time_str), float(utc_time_now), 
-                  int(day_of_week),int(push_notify))    
-    sf.insert_process_monitor(sql_db_loc,data_tuple)
+        # create the tuple that is inserted into the database. Ensure that all
+        # parameters are the right data type
+        data_tuple = (str(date_str), str(time_str), float(utc_time_now), 
+                  int(day_of_week),int(push_notify),'delayed_train')    
+        sf.insert_push_monitor(sql_db_loc,data_tuple)
 
 
 def construct_delay_text(delay_df, header, col_buf):

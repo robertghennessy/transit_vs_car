@@ -16,6 +16,7 @@ import shutil
 
 import config
 import sql_functions as sf
+import file_functions as ff
 
 
 # Take train if train fraction is greater than this number
@@ -166,12 +167,12 @@ def main():
     # turn off the interactive mode for pyplot
     plt.ioff()
     # create the results database
-    if os.path.exists(config.results_database):
-        os.remove(config.results_database)
-    sf.create_results_table(config.results_database)
+    ff.remove_files([config.results_summary_sql])
+    sf.create_results_table(config.results_summary_sql)
     
-    create_plots(config.trips_csv, config.results_summary_sql, 
-                 config.results_database, ecdf_dir, hist_dir,time_dir)
+    create_plots(config.trips_csv, config.traffic_data_sql, 
+                 config.results_summary_sql, ecdf_dir, 
+                 hist_dir, time_dir)
     
 if __name__ == '__main__':
     main()
