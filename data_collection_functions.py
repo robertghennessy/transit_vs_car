@@ -7,6 +7,7 @@ import datetime as dt
 import dateutil.parser as dp
 import json
 import logging
+import os
 import pandas as pd
 import random
 import requests
@@ -159,6 +160,7 @@ def query_transit_data_siri(data_db_location, schedule_monitor, time_index):
     :return: None: 
     """
     MonitoredStops = query_siri()
+    write_transit_data_to_json(config.siri_json_dir, 'siri-', MonitoredStops)
     parsed_data = parse_siri_transit_data(MonitoredStops, time_index)
     parsed_data_with_delays = compare_actual_to_schedule(parsed_data, 
                                                          schedule_monitor)  
@@ -567,6 +569,7 @@ def trip_timedelta(time_series):
     """
     (hours, mins, secs) = parse_timeseries(time_series)
     return pd.to_timedelta(60*60*hours+60*mins+secs, unit='s')
+
  
 
 """ Dummy Functions Used to Test Functionality """
@@ -651,7 +654,7 @@ def dummy_query_google_api():
         ['duration_in_traffic']['value'])
     return (duration_in_traffic, directions_result)
 
-
+""" Support Functions """
 
 def periodic_dummy_function(tstArg0, tstArg1):
     """
@@ -681,3 +684,28 @@ def ordered_unique_list(seq):
     """
     seen = set()
     return [x for x in seq if x not in seen and not seen.add(x)]
+
+    
+def write_transit_data_to_json(file_directory, file_prefix, json_data):
+    """
+    Writes a json to a file
+    
+    :param: file_directory: the name of the table to be deleted
+    :type: file_directory: string
+    
+    :param: file_prefix: the prefix that is added to beginning of the 
+        filename
+    :type: file_prefix: string
+    
+    :param: json_data: the data to be stored in json
+    :type: json_data: string   
+    
+    :return: None 
+    """
+    
+    dateTag = dt.datetime.now().strftime("%Y-%b-%d_%H-%M-%S")       
+    FileName = file_prefix + dateTag + '.json'
+    FileName = os.path.join(file_directory, FileName)
+    with open(FileName, 'w') as outfile:
+        json.dump(json_data, outfile)
+    return None

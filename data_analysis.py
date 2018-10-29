@@ -23,13 +23,13 @@ import file_functions as ff
 take_train_fract = 0.5
 
   
-def create_plots(csv_path_in, data_db_loc, results_db_loc, 
+def create_plots(csv_path_in, traffic_db_loc, results_db_loc, 
                  ecdf_dir,hist_dir,time_dir):
     """
     Plots the results and postprocesses the data to determine statistics for
     the train trips
 
-    :param: csv_path_in: file location produced by prepare to collect data
+    :param: csv_path_in: file location for schedule_trips.csv
     :type: csv_path_in: string
     
     :param: results_db_loc: file location to store the post processed data. 
@@ -47,47 +47,37 @@ def create_plots(csv_path_in, data_db_loc, results_db_loc,
     """
     # read in the schedule trips
     schedule_trips = pd.read_csv(csv_path_in, index_col=0)
-    ## Query the maximum time code in the data
-    utc_max = sf.query_data(data_db_loc,"select max(utc_time) from traffic_data")
-    utc_max = utc_max[0][0]
-    # convert the time code to local time
-    last_date = dt.datetime.utcfromtimestamp(float(utc_max))
-    last_date = last_date.replace(tzinfo=config.from_zone)
-    last_date = last_date.astimezone(config.to_zone)
-    # query the minimum time code in the data
-    utc_min = sf.query_data(data_db_loc,"select min(utc_time) from traffic_data")    
-    utc_min = utc_min[0][0]
-    # convert the time code to local time
-    first_date = dt.datetime.utcfromtimestamp(float(utc_min))
-    first_date = first_date.replace(tzinfo=config.from_zone)
-    first_date = first_date.astimezone(config.to_zone) 
+    # query the first and last date in the database  
+    first_date = min_max_date(traffic_db_loc, 'traffic_data', 'utc_time',
+                              'min')    
+    last_date = min_max_date(traffic_db_loc, 'traffic_data', 'utc_time',
+                              'max')  
     # round the first date to the bginning of the month for plotting
     date_min = first_date.replace(day=1)
     # round the last date to the end of the month for plotting
     date_max = last_date.replace(day=1, month=last_date.month+1)
-    # create a list of the trip_index stores in the results database
-    trip_index_list = sf.query_data(data_db_loc,
-                                "select distinct trip_index from traffic_data")  
-    trip_index_list = [x[0] for x in trip_index_list]
-    trip_index_list.sort()
     # connect to the data database
-    conn = sf.create_connection(data_db_loc) 
-    for trip_index in trip_index_list:
+    traffic_conn = sf.create_connection(traffic_db_loc) 
+    
+    for trip_index in list(schedule_trips.index):
         print("plotting trip_index = " + str(trip_index))
         # read in the data for a given trip_index
-        sql_query = "select * from traffic_data where trip_index = %g" % trip_index
-        data_df = pd.read_sql_query(sql_query, conn)
+        sql_query = """select * from traffic_data where 
+                        trip_index = %g""" % trip_index
+        traffic_data_df = pd.read_sql_query(sql_query, traffic_conn)
         # convert the date column to datetime
-        data_df['date'] = pd.to_datetime(data_df['date'], format="%Y-%m-%d")
+        traffic_data_df['date'] = pd.to_datetime(traffic_data_df['date'], 
+                                                format="%Y-%m-%d")
         # convert the duration in traffic to minutes
-        data_df['duration_in_traffic'] = data_df['duration_in_traffic']/60
+        traffic_data_df['duration_in_traffic'] = traffic_data_df[
+                                                    'duration_in_traffic']/60
         # scheduled trip time in minutes
         sched_trip_time = schedule_trips[schedule_trips['trip_index']==
             trip_index]['sched_trip_duration_secs'].values[0]/60
-        duration_in_traffic = data_df['duration_in_traffic'].values
-        start_station_str = data_df['start_station'].iloc[0]
-        end_station_str = data_df['end_station'].iloc[0]
-        train_number = data_df['trip_id'].iloc[0]
+        duration_in_traffic = traffic_data_df['duration_in_traffic'].values
+        start_station_str = traffic_data_df['start_station'].iloc[0]
+        end_station_str = traffic_data_df['end_station'].iloc[0]
+        train_number = traffic_data_df['trip_id'].iloc[0]
         title_str = ('Train ' + str(train_number) + ' - ' + start_station_str 
                     + ' to ' + end_station_str)
         filename = title_str + '.png'
@@ -112,7 +102,7 @@ def create_plots(csv_path_in, data_db_loc, results_db_loc,
         plt.close(fig)    
         # Trip duration versus date
         # create pandas series with the missing dates = NaN
-        trip_date = data_df[['date', 'duration_in_traffic']]
+        trip_date = traffic_data_df[['date', 'duration_in_traffic']]
         trip_date = trip_date.set_index('date')
         date_range = pd.date_range(first_date.date(), last_date.date())
         trip_date.index = pd.DatetimeIndex(trip_date.index)
@@ -128,21 +118,162 @@ def create_plots(csv_path_in, data_db_loc, results_db_loc,
         # set the axes so that it starts and ends on the first of a month
         ax.set_xlim(date_min, date_max)
         fig.savefig(os.path.join(time_dir, filename), bbox_inches='tight')
-        plt.close(fig)
-        
+        plt.close(fig)      
         # determine the fraction of trips greater than the train time
         trip_fract = sum(sorted_duration_in_traffic>sched_trip_time)/len(
             sorted_duration_in_traffic)
         take_train = int(trip_fract>=take_train_fract)
         duration_in_traffic_mean = np.mean(duration_in_traffic)
         duration_in_traffic_std = np.std(duration_in_traffic)
-        count = len(data_df.index)
+        count = len(traffic_data_df.index)
         data = (trip_index, str(train_number), start_station_str,
                       end_station_str, duration_in_traffic_mean,
                       duration_in_traffic_std, trip_fract,
                       take_train, sched_trip_time, count, filename)
         sf.insert_results(results_db_loc, data)
 
+
+def create_traffic_results_df(db_loc, table_name, trip_index):
+    """                                  
+    Pulls the data from the traffic database and performs some 
+        processing.
+
+    :param: db_loc: location of the db locations
+    :type: db_loc: string
+    
+    :param: table_name: name of the table to query
+    :type: table_name: string
+    
+    :param: trip_index: trip index number
+    :type: trip_index: int
+    
+    :return: traffic_data_df: dataframe that contains the date and trip 
+        duration
+    :type: traffic_data_df: pandas dataframe
+    """
+    traffic_conn = sf.create_connection(db_loc)
+    sql_query = """select * from %s where 
+                    trip_index = %g""" % (table_name, trip_index)
+    traffic_data_df = pd.read_sql_query(sql_query, traffic_conn)
+    # convert the date column to datetime
+    traffic_data_df['date'] = pd.to_datetime(traffic_data_df['date'], 
+                                            format="%Y-%m-%d")
+    # convert the duration in traffic to minutes
+    traffic_data_df['duration_in_traffic'] = traffic_data_df[
+                                                'duration_in_traffic']/60
+    traffic_data_df = traffic_data_df[['date', 'duration_in_traffic']]
+    traffic_data_df = traffic_data_df.set_index('date')
+    traffic_data_df.index = pd.DatetimeIndex(traffic_data_df.index)
+    return traffic_data_df
+        
+
+def create_transit_results_df(db_loc, table_name, trip_id, 
+                              stop_id, train_sched_trip_duration):
+    """                                  
+    Pulls the data from the gtfs-rt transit database and performs some 
+        processing.
+
+    :param: db_loc: location of the db locations
+    :type: db_loc: string
+    
+    :param: table_name: name of the table to query
+    :type: table_name: string
+    
+    :param: trip_id: train number
+    :type: trip_id: string
+
+    :param: stop_id: stop id number
+    :type: stop_id: string
+
+    :param: train_sched_trip_duration: the scheduled length of the train trip
+    :type: train_sched_trip_duration: float
+    
+    :return: transit_data_df: dataframe that contains the date and trip 
+        duration
+    :type: transit_data_df: pandas dataframe
+    """
+    transit_conn = sf.create_connection(db_loc) 
+    sql_query = """select * from %s where 
+                    trip_id = %g and stop_id = %g """ % (table_name, trip_id,
+                                                         stop_id)
+    transit_data_df = pd.read_sql_query(sql_query, transit_conn)
+    # convert the date column to datetimes
+    transit_data_df['TrainStartDate'] = pd.to_datetime(transit_data_df[
+                                            'TrainStartDate'], 
+                                            format="%Y-%m-%d")
+    # calculate the length of the train trip
+    transit_data_df['train_duration'] = (transit_data_df['DeperatureDelay'] + 
+                                            train_sched_trip_duration)/60
+    transit_data_df.rename(index=str, 
+                           columns={"TrainStartDate": "date"}, 
+                            inplace=True)
+    transit_data_df = transit_data_df[['date','train_duration']]
+    transit_data_df = transit_data_df.set_index('date')
+    transit_data_df.index = pd.DatetimeIndex(transit_data_df.index)
+    return transit_data_df
+
+
+def min_max_date(db_loc, table, column, func):
+    """
+    Query a date column and return the min/max date
+    
+    :param: db_loc: location of the db locations
+    :type: db_loc: string
+
+    :param: table: name of the table that should be queried
+    :type: table: string
+    
+    :param: column: name of the column that should be queried
+    :type: column: string
+    
+    :param: func: function to apply to the column (min or max)
+    :type: func: string
+    
+    :return: date: return the date that corresponds to the applied function
+    :type: date: datetime     
+    
+    """    
+    sql_query = "select %s(%s) from %s" % (func, column, table)    
+    utc = sf.query_data(db_loc, sql_query)
+    utc = utc[0][0]
+    # convert the time code to local time
+    date = dt.datetime.utcfromtimestamp(float(utc))
+    date = date.replace(tzinfo=config.from_zone)
+    date = date.astimezone(config.to_zone)
+    return date
+
+
+
+def plot_time_history(df, title_str, leg_str, sche_time=None):
+    # plot the time series data
+    fig, ax = plt.subplots()
+    df.plot(style='o-', legend=False, ax=ax)
+    plt.ylabel('Trip Duration [minutes]')
+    plt.title(title_str)
+    ax.fmt_xdata = mdates.DateFormatter('%Y-%m-%d')
+    # rotate and align the tick labels so they look better
+    fig.autofmt_xdate()
+    # set the axes so that it starts and ends on the first of a month
+    #ax.set_xlim(date_min, date_max)
+    # set the y axes limit
+    max_data = df.max().max()
+    if max_data == int(max_data):
+        max_data = max_data + 1
+    else:
+        max_data = np.ceil(max_data)
+    min_data = df.min().min()
+    if min_data == int(min_data):
+        min_data = min_data - 1
+    else:
+        min_data = np.floor(min_data)
+    ax.set_ylim(min_data, max_data)
+    if not sche_time == None:
+        ax.axhline(y=sche_time, linestyle='--',  color='r', label='Schedule')
+        # add legend
+        leg_str.append('Schedule')
+    plt.legend(leg_str, loc='lower left')
+    
+    
 
 def main():
     # Delete the files in the plot dir

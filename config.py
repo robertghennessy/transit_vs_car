@@ -39,7 +39,7 @@ test_collect_data_log_file = os.path.join(test_logs_dir,
 test_prepare_log_file = os.path.join(test_logs_dir, prepare_log_filename)
 test_transit_log_file = os.path.join(test_logs_dir, transit_log_filename)
 # filenames of the sql databases
-traffic_data_sql_filename = 'taffic_data.sqlite'
+traffic_data_sql_filename = 'traffic_data.sqlite'
 siri_data_sql_filename = 'siri_data.sqlite'
 gtfs_rt_data_sql_filename = 'gtfs_rt_data.sqlite'
 scheduler_sql_filename = 'tasks.sqlite'
@@ -65,6 +65,9 @@ test_process_monitor_sql = os.path.join(test_file_dir,
                                         process_monitor_sql_filename)
 test_results_summary_sql = os.path.join(test_file_dir, 
                                         results_summary_sql_filename)
+# directories to store json
+siri_json_dir = os.path.join(test_file_dir, 'josn-siri\\')
+gtfs_rt_json_dir = os.path.join(test_file_dir, 'josn-gtfs-rt\\')
 # name of the csv files
 trips_csv_filename = 'schedule_trips.csv'
 periodic_jobs_csv_filename = 'periodic_jobs_schedule.csv'

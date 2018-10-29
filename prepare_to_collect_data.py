@@ -260,6 +260,12 @@ def create_schedule_monitor_csv(schedule, stops, csv_out_path):
 
 
 def main():
+    # create the directories
+    ff.create_directories([config.file_dir, config.plot_dir, config.logs_dir,
+                           config.test_file_dir, config.test_plot_dir,
+                           config.test_logs_dir, config.siri_json_dir, 
+                           config.gtfs_rt_json_dir])  
+    
     # remove the  files
     ff.remove_files([config.trips_csv, 
                      config.scheduler_sql,
@@ -268,8 +274,8 @@ def main():
     parse_gfts(stations,config.gtfs_zip_path, config.trips_csv, 
                config.schedule_monitor_csv)       
     #  Add the traffic jobs
-    #sched.add_traffic_jobs(dcf.query_google_traffic, config.trips_csv, 
-    #                    config.scheduler_sql, config.traffic_data_sql)
+    sched.add_traffic_jobs(dcf.query_google_traffic, config.trips_csv, 
+                        config.scheduler_sql, config.traffic_data_sql)
     # Add the transit jobs
     time_df = sched.create_collect_time(collect_transit_time,
                                     collect_transit_frequency,

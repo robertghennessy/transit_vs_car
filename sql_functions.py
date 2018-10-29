@@ -435,7 +435,7 @@ def delete_entries_in_common(table_modified, table_base,
 
 def copy_new_entries(table_modified, table_base, columns_to_compare):
     """
-    Construct sql_query to copy new entries entries
+    Construct sql_query to copy new entries
     
     :param: table_modified: the name of the table to be modified
     :type: string

@@ -13,7 +13,7 @@ def remove_files(file_list):
     Removes the files in the file list
     
     :param: file_list: list of the files that should be removed
-    :type: list of strings
+    :type: file_list: list of strings
     
     :return: None
     """
@@ -22,6 +22,7 @@ def remove_files(file_list):
             os.remove(file)
         else:    # Show an error #
             print("Error: %s file not found" % file)
+    return None
 
 
 def find_files_that_filename_contain(directory, name_contains):
@@ -45,3 +46,19 @@ def find_files_that_filename_contain(directory, name_contains):
             ret_list.append(os.path.join(directory, file))
     return ret_list
 
+
+def create_directories(dir_list):
+    """
+    Create directories in the directory list
+    
+    :param: dir_list: list of the files that should be removed
+    :type: dir_list: list of strings
+    
+    :return: None
+    """
+    for direc in dir_list:
+        if not os.path.isdir(direc):
+            os.mkdir(direc)
+        else:    # Show an error #
+            print("Directory, %s, already exists" % direc)
+    return None

@@ -6,29 +6,19 @@ Description: This file contains a function to write the ouput of query function
 
 """
 
-import datetime as dt
-import json
-import os
+import file_functions as ff
+
 
 import config
 import data_collection_functions as dcf
 
-
-def write_data_to_json():
-    dateTag = dt.datetime.now().strftime("%Y-%b-%d_%H-%M-%S")       
-    siriFileName = 'siri-' + dateTag + '.json'
-    siriFileName = os.path.join(config.test_file_dir, siriFileName)
-    with open(siriFileName, 'w') as outfile:
-        json.dump(dcf.query_siri(), outfile)
-    gtfs_rtFileName = 'gtfs-rt-' + dateTag + '.json'
-    gtfs_rtFileName = os.path.join(config.test_file_dir, gtfs_rtFileName)
-    with open(gtfs_rtFileName, 'w') as outfile:
-        json.dump(dcf.query_gtfs_rt(), outfile)
-
-
-
 def main():
-    write_data_to_json()
+        
+    ff.create_directories([config.siri_json_dir, config.gtfs_rt_json_dir])
+    dcf.write_transit_data_to_json(config.siri_json_dir, 'siri-',
+                                   dcf.query_siri())
+    dcf.write_transit_data_to_json(config.gtfs_rt_json_dir,'gtfs-rt-',
+                               dcf.query_gtfs_rt())
       
 if __name__ == '__main__':
     main()
