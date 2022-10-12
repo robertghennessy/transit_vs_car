@@ -6,7 +6,7 @@ Description: This program was written to collect the data by calling the
 """
 
 import datetime as dt
-import logging, logging.handlers
+import logging.handlers
 
 import config
 import push_notification as pn
@@ -27,15 +27,20 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
+def main():
+    """
+    Runs the tasks in the task database.
 
-
-def main():   
+    :return None
+    :rtype: None
+    """
     # save the process data monitor and send a push notification 
     # when restarted
     pn.restart_push_notify(config.process_monitor_sql,
-                           'Car vs Caltrain Restarted',log_filename)
-    # run the tasks in the databse
+                           'Car vs Caltrain Restarted', log_filename)
+    # run the tasks in the database
     sched.run_tasks(config.scheduler_sql) 
-    
+
+
 if __name__ == '__main__':
     main()
